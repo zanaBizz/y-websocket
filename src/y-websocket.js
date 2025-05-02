@@ -314,7 +314,7 @@ export class WebsocketProvider extends ObservableV2 {
       resyncInterval = -1,
       maxBackoffTime = 2500,
       disableBc = false,
-      customEventPreProcess = defaultEventPreProcess,
+      customEventPreProcess,
       customWritePreProcess = undefined
     } = {}
   ) {
