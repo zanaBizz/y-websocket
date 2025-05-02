@@ -123,6 +123,16 @@ const readMessage = (provider, buf, emitSynced) => {
   return encoder
 }
 
+const handleSendPreProcess = (provider, buf) => {
+  let data
+  if (provider.customWritePreProcess) {
+    data = provider.customWritePreProcess(encoding.toUint8Array(buf))
+  } else {
+    data = encoding.toUint8Array(buf)
+  }
+  return data
+}
+
 /**
  * Outsource this function so that a new websocket connection is created immediately.
  * I suspect that the `ws.onclose` event is not always fired if there are network issues.
@@ -169,6 +179,11 @@ const closeWebsocketConnection = (provider, ws, event) => {
   }
 }
 
+/**
+ * @function
+ * @param {object} event
+ * @return {object}
+ */
 const defaultEventPreProcess = (event) => {
   event.data = new Uint8Array(event.data)
   return event
@@ -192,7 +207,8 @@ const setupWS = (provider) => {
       provider.eventPreProcess(_event)
       const encoder = readMessage(provider, _event.data, true)
       if (encoding.length(encoder) > 1) {
-        websocket.send(encoding.toUint8Array(encoder))
+        const data = handleSendPreProcess(provider, encoder)
+        websocket.send(data)
       }
     }
     websocket.onerror = (event) => {
@@ -215,7 +231,8 @@ const setupWS = (provider) => {
       const encoder = encoding.createEncoder()
       encoding.writeVarUint(encoder, messageSync)
       syncProtocol.writeSyncStep1(encoder, provider.doc)
-      websocket.send(encoding.toUint8Array(encoder))
+      const data = handleSendPreProcess(provider, encoder)
+      websocket.send(data)
       // broadcast local awareness state
       if (provider.awareness.getLocalState() !== null) {
         const encoderAwarenessState = encoding.createEncoder()
@@ -226,7 +243,8 @@ const setupWS = (provider) => {
             provider.doc.clientID
           ])
         )
-        websocket.send(encoding.toUint8Array(encoderAwarenessState))
+        const data = handleSendPreProcess(provider, encoderAwarenessState)
+        websocket.send(data)
       }
     }
     provider.emit('status', [
@@ -279,6 +297,7 @@ export class WebsocketProvider extends ObservableV2 {
    * @param {number} [opts.maxBackoffTime] Maximum amount of time to wait before trying to reconnect (we try to reconnect using exponential backoff)
    * @param {boolean} [opts.disableBc] Disable cross-tab BroadcastChannel communication
    * @param {defaultEventPreProcess} [opts.customEventPreProcess] Optional pre-processing on incomeing messages
+   * @param {any} [opts.customWritePreProcess] Optional pre-processing before sending messages
    */
   constructor (
     serverUrl,
@@ -293,7 +312,8 @@ export class WebsocketProvider extends ObservableV2 {
       resyncInterval = -1,
       maxBackoffTime = 2500,
       disableBc = false,
-      customEventPreProcess = defaultEventPreProcess
+      customEventPreProcess = defaultEventPreProcess,
+      customWritePreProcess = undefined
     } = {}
   ) {
     super()
@@ -322,6 +342,7 @@ export class WebsocketProvider extends ObservableV2 {
     this.wsUnsuccessfulReconnects = 0
     this.messageHandlers = messageHandlers.slice()
     this.eventPreProcess = customEventPreProcess || defaultEventPreProcess
+    this.customWritePreProcess = customWritePreProcess
     /**
      * @type {boolean}
      */
