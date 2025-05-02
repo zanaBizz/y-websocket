@@ -261,13 +261,12 @@ const setupWS = (provider) => {
  */
 const broadcastMessage = (provider, encoder) => {
   const ws = provider.ws
+  const data = handleSendPreProcess(provider, encoder)
   if (provider.wsconnected && ws && ws.readyState === ws.OPEN) {
-    const data = handleSendPreProcess(provider, encoder)
     ws.send(data)
   }
   if (provider.bcconnected) {
-    const buf = encoding.toUint8Array(encoder)
-    bc.publish(provider.bcChannel, buf, provider)
+    bc.publish(provider.bcChannel, data, provider)
   }
 }
 
@@ -385,9 +384,11 @@ export class WebsocketProvider extends ObservableV2 {
      */
     this._bcSubscriber = (data, origin) => {
       if (origin !== this) {
-        const encoder = readMessage(this, new Uint8Array(data), false)
+        const { dataNew } = this.eventPreProcess({ data })
+        const encoder = readMessage(this, dataNew, false)
         if (encoding.length(encoder) > 1) {
-          bc.publish(this.bcChannel, encoding.toUint8Array(encoder), this)
+          const data = handleSendPreProcess(this, encoder)
+          bc.publish(this.bcChannel, data, this)
         }
       }
     }
@@ -505,20 +506,22 @@ export class WebsocketProvider extends ObservableV2 {
     const encoderSync = encoding.createEncoder()
     encoding.writeVarUint(encoderSync, messageSync)
     syncProtocol.writeSyncStep1(encoderSync, this.doc)
-    bc.publish(this.bcChannel, encoding.toUint8Array(encoderSync), this)
+    const syncData = handleSendPreProcess(this, encoderSync)
+    bc.publish(this.bcChannel, syncData, this)
     // broadcast local state
     const encoderState = encoding.createEncoder()
     encoding.writeVarUint(encoderState, messageSync)
     syncProtocol.writeSyncStep2(encoderState, this.doc)
-    bc.publish(this.bcChannel, encoding.toUint8Array(encoderState), this)
+    const stateData = handleSendPreProcess(this, encoderState)
+    bc.publish(this.bcChannel, stateData, this)
     // write queryAwareness
     const encoderAwarenessQuery = encoding.createEncoder()
     encoding.writeVarUint(encoderAwarenessQuery, messageQueryAwareness)
-    bc.publish(
-      this.bcChannel,
-      encoding.toUint8Array(encoderAwarenessQuery),
-      this
+    const awarenessQueryData = handleSendPreProcess(
+      this,
+      encoderAwarenessQuery
     )
+    bc.publish(this.bcChannel, awarenessQueryData, this)
     // broadcast local awareness state
     const encoderAwarenessState = encoding.createEncoder()
     encoding.writeVarUint(encoderAwarenessState, messageAwareness)
@@ -528,11 +531,11 @@ export class WebsocketProvider extends ObservableV2 {
         this.doc.clientID
       ])
     )
-    bc.publish(
-      this.bcChannel,
-      encoding.toUint8Array(encoderAwarenessState),
-      this
+    const awarenessStateData = handleSendPreProcess(
+      this,
+      encoderAwarenessState
     )
+    bc.publish(this.bcChannel, awarenessStateData, this)
   }
 
   disconnectBc () {
