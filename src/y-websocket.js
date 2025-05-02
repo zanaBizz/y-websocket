@@ -257,14 +257,16 @@ const setupWS = (provider) => {
 
 /**
  * @param {WebsocketProvider} provider
- * @param {ArrayBuffer} buf
+ * @param {encoding.Encoder} encoder
  */
-const broadcastMessage = (provider, buf) => {
+const broadcastMessage = (provider, encoder) => {
   const ws = provider.ws
   if (provider.wsconnected && ws && ws.readyState === ws.OPEN) {
-    ws.send(buf)
+    const data = handleSendPreProcess(this, encoder)
+    ws.send(data)
   }
   if (provider.bcconnected) {
+    const buf = encoding.toUint8Array(encoder)
     bc.publish(provider.bcChannel, buf, provider)
   }
 }
@@ -370,7 +372,8 @@ export class WebsocketProvider extends ObservableV2 {
             const encoder = encoding.createEncoder()
             encoding.writeVarUint(encoder, messageSync)
             syncProtocol.writeSyncStep1(encoder, doc)
-            this.ws.send(encoding.toUint8Array(encoder))
+            const data = handleSendPreProcess(this, encoder)
+            this.ws.send(data)
           }
         }, resyncInterval)
       )
@@ -398,7 +401,7 @@ export class WebsocketProvider extends ObservableV2 {
         const encoder = encoding.createEncoder()
         encoding.writeVarUint(encoder, messageSync)
         syncProtocol.writeUpdate(encoder, update)
-        broadcastMessage(this, encoding.toUint8Array(encoder))
+        broadcastMessage(this, encoder)
       }
     }
     this.doc.on('update', this._updateHandler)
@@ -414,7 +417,7 @@ export class WebsocketProvider extends ObservableV2 {
         encoder,
         awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients)
       )
-      broadcastMessage(this, encoding.toUint8Array(encoder))
+      broadcastMessage(this, encoder)
     }
     this._exitHandler = () => {
       awarenessProtocol.removeAwarenessStates(
@@ -544,7 +547,7 @@ export class WebsocketProvider extends ObservableV2 {
         new Map()
       )
     )
-    broadcastMessage(this, encoding.toUint8Array(encoder))
+    broadcastMessage(this, encoder)
     if (this.bcconnected) {
       bc.unsubscribe(this.bcChannel, this._bcSubscriber)
       this.bcconnected = false
