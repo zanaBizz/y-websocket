@@ -262,7 +262,7 @@ const setupWS = (provider) => {
 const broadcastMessage = (provider, encoder) => {
   const ws = provider.ws
   if (provider.wsconnected && ws && ws.readyState === ws.OPEN) {
-    const data = handleSendPreProcess(this, encoder)
+    const data = handleSendPreProcess(provider, encoder)
     ws.send(data)
   }
   if (provider.bcconnected) {
