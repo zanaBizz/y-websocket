@@ -203,6 +203,7 @@ const setupWS = (provider) => {
 
     websocket.onmessage = (event) => {
       provider.wsLastMessageReceived = time.getUnixTime()
+      console.log('WS on message', { event })
       let _event = event
       provider.eventPreProcess(_event)
       const encoder = readMessage(provider, _event.data, true)
