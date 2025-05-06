@@ -185,8 +185,8 @@ const closeWebsocketConnection = (provider, ws, event) => {
  * @return {object}
  */
 const defaultEventPreProcess = (event) => {
-  event.data = new Uint8Array(event.data)
-  return event
+  let newEvent = { ...event, data: new Uint8Array(event.data) }
+  return newEvent
 }
 
 /**
